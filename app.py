@@ -5,18 +5,42 @@ import os
 from flask import Flask, render_template
 
 from auth_routes import auth_bp
+from account_routes import email_bp
+from certificate_routes import certificates_bp
+from dashboard_routes import dashboard_bp
 from event_routes import events_bp
+from formatting import format_decimal
+from notification_routes import notifications_bp
+from event_presentation import EVENT_CATEGORIES, event_visual
+from prismlabs_routes import prism_bp
 
 
 app = Flask(__name__)
+app.jinja_env.filters["format_decimal"] = format_decimal
+app.jinja_env.globals.update(event_categories=EVENT_CATEGORIES, event_visual=event_visual)
 app.register_blueprint(auth_bp)
+app.register_blueprint(email_bp)
+app.register_blueprint(certificates_bp)
+app.register_blueprint(dashboard_bp)
 app.register_blueprint(events_bp)
+app.register_blueprint(notifications_bp)
+app.register_blueprint(prism_bp)
+
+
+def home_steps() -> list[dict[str, str]]:
+    """Return the four public steps shown on the home page."""
+    return [
+        {"number": "01", "title": "Find an event that fits your skills"},
+        {"number": "02", "title": "Apply in one click"},
+        {"number": "03", "title": "Get accepted by the organizer"},
+        {"number": "04", "title": "Earn a certificate anyone can verify"},
+    ]
 
 
 @app.get("/")
 def home():
     """Show the shared foundation landing page."""
-    return render_template("index.html")
+    return render_template("index.html", steps=home_steps())
 
 
 # Teammate 1 — Accounts and profiles: import and register the accounts Blueprint here.
@@ -40,6 +64,12 @@ def home():
 def page_not_found(_error):
     """Render the shared not-found page for unknown routes."""
     return render_template("404.html"), 404
+
+
+@app.errorhandler(500)
+def internal_server_error(_error):
+    """Show a friendly page without exposing internal exception details."""
+    return render_template("500.html"), 500
 
 
 if __name__ == "__main__":
