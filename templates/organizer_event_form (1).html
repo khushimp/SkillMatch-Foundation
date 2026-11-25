@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% from "macros.html" import toast %}
+
+{% block title %}{{ "Create" if mode == "create" else "Edit" }} event · SkillMatch{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='profile-skills.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section class="event-form-panel" aria-labelledby="event-form-title">
+    <p class="eyebrow">Organizer workspace</p>
+    <h1 id="event-form-title">{{ "Create an event" if mode == "create" else "Edit event" }}</h1>
+    <p>Share the details students need to decide whether to apply.</p>
+
+    {% if error %}{{ toast(error, "error") }}{% endif %}
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      {{ toast(message, category) }}
+    {% endfor %}
+
+    <form id="event-form" class="event-form" method="post"
+          action="{% if mode == 'create' %}{{ url_for('dashboard.create_event') }}{% else %}{{ url_for('dashboard.save_event_edits', event_id=event_id) }}{% endif %}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="departments_present" value="1">
+      <input type="hidden" name="required_skill_names_present" value="1">
+      {% if event_id %}<input type="hidden" name="event_id" value="{{ event_id }}">{% endif %}
+
+      <div class="event-form-grid">
+        <p class="event-form-field">
+          <label for="title">Title</label>
+          <input id="title" name="title" type="text" maxlength="120" required
+                 value="{{ form_values.get('title', '') }}">
+        </p>
+        <section class="event-form-field event-form-field--wide profile-skill-picker"
+                 aria-labelledby="participating-departments-title">
+          <h2 id="participating-departments-title">Departments invited</h2>
+          <label for="department-search">Search departments</label>
+          <input id="department-search" name="department_search" type="search"
+                 placeholder="Search departments"
+                 hx-get="{{ url_for('dashboard.event_options') }}"
+                 hx-trigger="input changed delay:200ms, search"
+                 hx-vals='{"option_group":"departments"}'
+                 hx-params="option_group,department_search,departments"
+                 hx-include="#event-form"
+                 hx-target="#event-department-options"
+                 hx-swap="innerHTML">
+          <div id="event-department-options">
+            {% include "organizer_event_department_options.html" %}
+          </div>
+          <small id="departments-help">
+            Check every department you want to invite.
+            Leave the selection empty to invite all departments.
+          </small>
+        </section>
+        <p class="event-form-field">
+          <label for="event_type">Event type</label>
+          <input id="event_type" name="event_type" type="text" maxlength="100" required
+                 value="{{ form_values.get('event_type', '') }}">
+        </p>
+        <p class="event-form-field">
+          <label for="venue">Venue</label>
+          <input id="venue" name="venue" type="text" maxlength="160" required
+                 value="{{ form_values.get('venue', '') }}">
+        </p>
+        <p class="event-form-field">
+          <label for="category">Category</label>
+          <select id="category" name="category">
+            {% for category in event_categories %}
+              <option value="{{ category }}" {% if form_values.get('category', 'Community Service') == category %}selected{% endif %}>{{ category }}</option>
+            {% endfor %}
+          </select>
+        </p>
+        <p class="event-form-field">
+          <label for="image_url">Event image URL (optional)</label>
+          <input id="image_url" name="image_url" type="url" maxlength="2048"
+                 value="{{ form_values.get('image_url', '') }}" placeholder="https://…"
+                 aria-describedby="image-url-help">
+          <small id="image-url-help">Use an HTTPS photo URL you have permission to share. Leave blank to show no event image.</small>
+        </p>
+        <p class="event-form-field">
+          <label for="date">Date</label>
+          <input id="date" name="date" type="date" required
+                 value="{{ form_values.get('date', '') }}">
+        </p>
+        <p class="event-form-field">
+          <label for="start_time">Start time (IST)</label>
+          <input id="start_time" name="start_time" type="time" required
+                 value="{{ form_values.get('start_time', '09:00') }}">
+        </p>
+        <p class="event-form-field">
+          <label for="duration">Duration (hours)</label>
+          <input id="duration" name="duration" type="number" min="0.01" max="72" step="any" required
+                 value="{{ form_values.get('duration', '1') }}">
+        </p>
+        <p class="event-form-field">
+          <label for="seats">Volunteer seats</label>
+          <input id="seats" name="seats" type="number" min="1" max="10000" step="1" required
+                 value="{{ form_values.get('seats', '') }}">
+        </p>
+        <p class="event-form-field event-form-field--wide">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="5" maxlength="3000" required>{{ form_values.get('description', '') }}</textarea>
+        </p>
+        <section class="event-form-field event-form-field--wide profile-skill-picker"
+                 aria-labelledby="required-skills-title">
+          <h2 id="required-skills-title">Required skills</h2>
+          <label for="skill-search">Search skills</label>
+          <input id="skill-search" name="skill_search" type="search"
+                 placeholder="Search department and general skills"
+                 hx-get="{{ url_for('dashboard.event_options') }}"
+                 hx-trigger="input changed delay:200ms, search"
+                 hx-vals='{"option_group":"skills"{% if event_id %}, "event_id":"{{ event_id }}"{% endif %}}'
+                 hx-params="option_group,event_id,skill_search,required_skill_names"
+                 hx-include="#event-form"
+                 hx-target="#event-skill-options"
+                 hx-swap="innerHTML">
+          <div id="event-skill-options">
+            {% include "organizer_event_skill_options.html" %}
+          </div>
+          <small id="skills-help">
+            Check every skill you want to require.
+            Use “Update selected skills” to set a minimum rating for each one.
+          </small>
+          <button class="button button--secondary event-skill-rating-update"
+                  type="button"
+                  hx-post="{{ url_for('dashboard.event_skill_ratings') }}"
+                  hx-include="#event-form"
+                  hx-target="#event-skill-ratings"
+                  hx-swap="innerHTML">
+            Update selected skills
+          </button>
+          <div id="event-skill-ratings" aria-live="polite">
+            {% include "organizer_event_skill_ratings.html" %}
+          </div>
+          <fieldset class="event-skill-mode">
+            <legend>Skill requirement mode</legend>
+            <label>
+              <input type="radio" name="skill_requirement_mode" value="none"
+                     {% if form_values.get('skill_requirement_mode', 'none') == 'none' %}checked{% endif %}>
+              No skills required
+            </label>
+            <label>
+              <input type="radio" name="skill_requirement_mode" value="selected"
+                     {% if form_values.get('skill_requirement_mode') == 'selected' %}checked{% endif %}>
+              Require the selected skills
+            </label>
+          </fieldset>
+        </section>
+      </div>
+
+      <div class="event-form-actions">
+        <button class="button button--primary" type="submit">
+          {{ "Create event" if mode == "create" else "Save changes" }}
+        </button>
+        <a class="button button--secondary" href="{{ url_for('dashboard.home') }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}
