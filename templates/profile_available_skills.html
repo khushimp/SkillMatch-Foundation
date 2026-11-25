@@ -1,0 +1,33 @@
+{% set selected_names = profile_selected_skills|map(attribute="name")|map("lower")|list %}
+<label for="department-skill">Your department’s skills</label>
+<select id="department-skill" name="department_skill" aria-describedby="department-skill-help"
+        hx-post="{{ profile_skill_picker_url }}" hx-trigger="change"
+        hx-vals='{"action":"add_skill","skill_group":"department"}'
+        hx-include="#{{ profile_form_id }}" hx-target="#profile-skills-state" hx-swap="outerHTML">
+  <option value="">Select a department skill</option>
+  {% for skill in profile_department_skills %}
+    <option value="{{ skill }}" {% if skill|lower in selected_names %}disabled{% endif %}>{{ skill }}{% if skill|lower in selected_names %} · Added{% endif %}</option>
+  {% endfor %}
+</select>
+<p id="department-skill-help" class="profile-skill-help">
+  {% if not profile_department %}Select your department above to load its skills.
+  {% elif not profile_department_skills %}No matching department skills. If your saved department is no longer listed, select it again above.
+  {% else %}Skills for {{ profile_department }}. Select one to add it, then set its rating.{% endif %}
+</p>
+<label for="general-skill">General skills and languages</label>
+<select id="general-skill" name="general_skill"
+        hx-post="{{ profile_skill_picker_url }}" hx-trigger="change"
+        hx-vals='{"action":"add_skill","skill_group":"general"}'
+        hx-include="#{{ profile_form_id }}" hx-target="#profile-skills-state" hx-swap="outerHTML">
+  <option value="">Select a general skill or language</option>
+  <optgroup label="General skills">
+    {% for skill in profile_general_skills %}
+      <option value="{{ skill }}" {% if skill|lower in selected_names %}disabled{% endif %}>{{ skill }}{% if skill|lower in selected_names %} · Added{% endif %}</option>
+    {% endfor %}
+  </optgroup>
+  <optgroup label="Spoken languages">
+    {% for skill in profile_spoken_languages %}
+      <option value="{{ skill }}" {% if skill|lower in selected_names %}disabled{% endif %}>{{ skill }}{% if skill|lower in selected_names %} · Added{% endif %}</option>
+    {% endfor %}
+  </optgroup>
+</select>

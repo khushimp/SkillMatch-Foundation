@@ -1,18 +1,37 @@
 <div id="registration-profile-fields">
-  {% if selected_role == "Organizer" %}
+  {% if form_data.get('role', 'Student Volunteer') == "Organizer" %}
     <p><small>Organizers don’t need to provide a department or skills.</small></p>
   {% else %}
-    <p>
-      <label for="dept">Department</label><br>
-      <input id="dept" name="dept" type="text"
-             value="{{ form_data.get('dept', '') }}"
-             autocomplete="organization" maxlength="100" required>
-    </p>
-    <p>
-      <label for="skills">Skills and ratings</label><br>
-      <textarea id="skills" name="skills" rows="3" required
-                placeholder="Photography:4, Event planning:3">{{ form_data.get('skills', '') }}</textarea>
-      <br><small>Required for student volunteers. Separate entries with commas; ratings are whole numbers starting at 0.</small>
-    </p>
+    <section class="profile-skills-editor" aria-labelledby="registration-department-label">
+      <label id="registration-department-label" for="registration-department-search">Department</label>
+      <input id="registration-department-search" name="department_search" type="search"
+             placeholder="Search departments"
+             aria-label="Search departments"
+             hx-get="{{ profile_department_options_url }}"
+             hx-trigger="input changed delay:250ms, search"
+             hx-target="#dept" hx-swap="outerHTML"
+             hx-params="dept,department_search"
+             hx-include="#registration-form">
+      {% include "profile_department_select.html" %}
+      {% with
+        profile_department=form_data.get('dept', ''),
+        profile_selected_skills=profile_selected_skills,
+        profile_skills_string=profile_skills_string,
+        profile_skill_search=profile_skill_search,
+        profile_skill_error=profile_skill_error,
+        profile_department_skills=profile_department_skills,
+        profile_general_skills=profile_general_skills,
+        profile_cross_department_skills=profile_cross_department_skills,
+        profile_cross_skill_search=profile_cross_skill_search,
+        profile_skill_picker_url=profile_skill_picker_url,
+        profile_form_id=profile_form_id
+      %}
+        {% include "profile_skill_picker.html" %}
+      {% endwith %}
+      <p class="profile-rating-legend">
+        <strong>Rating:</strong> 1 = Beginner, 2 = Basic, 3 = Intermediate,
+        4 = Advanced, 5 = Expert.
+      </p>
+    </section>
   {% endif %}
 </div>

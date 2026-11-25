@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "macros.html" import toast %}
+
+{% block title %}Private email settings · SkillMatch{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='account-email.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section class="account-email-panel" aria-labelledby="account-email-title">
+    <p class="eyebrow">Account security</p>
+    <h1 id="account-email-title">Private email settings</h1>
+    <p class="account-email-intro">Keep a private recovery address on file. It is separate from your public volunteer profile.</p>
+    <div class="account-email-feedback" aria-live="polite">
+      {% for category, message in get_flashed_messages(with_categories=true) %}
+        {{ toast(message, category) }}
+      {% endfor %}
+    </div>
+
+    <dl class="account-email-status">
+      <dt>Current address</dt>
+      <dd>
+        {% if email_status.email %}
+          {{ email_status.email }}
+          {% if email_status.email_verified %}<span class="email-state">Verified</span>{% else %}<span class="email-state email-state--pending">Not verified</span>{% endif %}
+        {% else %}
+          No address added
+        {% endif %}
+      </dd>
+      {% if email_status.pending_email %}
+        <dt>Waiting to verify</dt>
+        <dd>{{ email_status.pending_email }}</dd>
+      {% endif %}
+    </dl>
+
+    <div class="account-email-note">
+      <strong>Your email is private to your account.</strong>
+      <p>New addresses must end in @mitwpu.edu.in. Your username does not change. A verified address stays active until any replacement is confirmed.</p>
+    </div>
+
+    <form class="account-email-form" method="post" action="{{ url_for('account_email.settings') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <p>
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email" value="{{ email_status.pending_email or email_status.email or '' }}"
+               autocomplete="email" maxlength="254" required>
+      </p>
+      <p>
+        <label for="current_password">Current password</label>
+        <input id="current_password" name="current_password" type="password"
+               autocomplete="current-password" required>
+      </p>
+      <button class="button button--primary" type="submit">Save email address</button>
+    </form>
+
+    {% if delivery_ready and (email_status.pending_email or (email_status.email and not email_status.email_verified)) %}
+      <form class="account-email-resend" method="post" action="{{ url_for('account_email.resend_own') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <p>Need another verification message?</p>
+        <button class="button button--secondary" type="submit">Resend verification email</button>
+      </form>
+    {% endif %}
+
+    <nav class="account-email-links" aria-label="Account settings">
+      <a href="{{ url_for('auth.change_password') }}">Change password</a>
+      <a href="{{ url_for('auth.profile') }}">Back to profile</a>
+    </nav>
+  </section>
+{% endblock %}

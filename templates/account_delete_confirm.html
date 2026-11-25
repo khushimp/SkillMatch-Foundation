@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "macros.html" import toast %}
+
+{% block title %}Delete account · SkillMatch{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='account-email.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section class="account-email-panel" aria-labelledby="delete-account-title">
+    <p class="eyebrow">Account security</p>
+    <h1 id="delete-account-title">Delete your account</h1>
+    <p class="account-email-intro">
+      This will immediately disable sign-in for <strong>{{ username }}</strong> and remove its email and profile details.
+    </p>
+
+    {% if error %}{{ toast(error, "error") }}{% endif %}
+
+    <div class="account-email-note account-email-note--warning">
+      <strong>Your account history will be retained.</strong>
+      {% if role == "Organizer" %}
+        <p>Your events will be hidden from active listings. Existing applications, event records, and certificates will remain in the system.</p>
+      {% else %}
+        <p>Your applications and issued certificate records will remain. Your username will stay as a history reference and cannot be reused for a new account.</p>
+      {% endif %}
+      <p>Retained event, application, roster, and certificate records may still contain your name or username; these are not active sign-in or profile data. Separately managed PrismLabs roster records are not deleted.</p>
+      <p>There is no self-service restore option. You will be signed out after deletion.</p>
+    </div>
+
+    <form class="account-email-form" method="post"
+          action="{{ url_for('account_email.delete_account') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <p>
+        <label for="current-password">Current password</label>
+        <input id="current-password" name="current_password" type="password"
+               autocomplete="current-password" required>
+      </p>
+      <p>
+        <label>
+          <input type="checkbox" name="confirm_delete" value="yes" required>
+          I understand my account will be deactivated and history retained.
+        </label>
+      </p>
+      <button class="button button--primary" type="submit">Deactivate my account</button>
+      <a class="button button--secondary" href="{{ url_for('auth.profile') }}">Cancel</a>
+    </form>
+  </section>
+{% endblock %}

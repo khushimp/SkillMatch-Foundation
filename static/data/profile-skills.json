@@ -1,0 +1,112 @@
+{
+  "schools": [
+    {
+      "name": "School of Engineering and Technology",
+      "departments": [
+        {"name": "Civil Engineering", "skills": ["AutoCAD", "Revit", "STAAD.Pro", "Structural analysis", "Surveying", "Cost estimation", "Geotechnical engineering", "Construction management", "Site supervision", "Project scheduling"]},
+        {"name": "Mechanical Engineering", "skills": ["SolidWorks", "CATIA", "ANSYS", "CAD design", "3D printing", "CNC machining", "CFD analysis", "Robotics", "Automation", "Product prototyping"]},
+        {"name": "Chemical Engineering", "skills": ["Aspen Plus", "Process design", "Process safety", "Heat and mass transfer", "Chemical analysis", "Quality control", "Water treatment", "Polymer processing", "MATLAB"]},
+        {"name": "Materials Science & Engineering", "skills": ["XRD analysis", "SEM imaging", "Metallurgy", "Nanomaterials", "Composites", "Corrosion testing", "Failure analysis", "Material testing", "Thin film fabrication"]},
+        {"name": "Electrical and Electronics Engineering", "skills": ["Circuit design", "PCB design", "Arduino", "Raspberry Pi", "Embedded C", "IoT", "PLC programming", "SCADA", "MATLAB", "Simulink", "VLSI design", "Solar system design", "Power systems", "Signal processing", "Soldering"]},
+        {"name": "Petroleum Engineering", "skills": ["Reservoir engineering", "Drilling engineering", "Well logging", "Petrophysics", "Petrel", "Production engineering", "Enhanced oil recovery", "HSE practices"]},
+        {"name": "Bioengineering", "skills": ["Cell culture", "Bioprocess engineering", "Fermentation", "Biomedical devices", "Tissue engineering", "Genetic engineering", "Bioinformatics", "Biostatistics", "Lab safety", "MATLAB"]},
+        {"name": "Polytechnic", "skills": ["Technical drawing", "AutoCAD basics", "Workshop fabrication", "Welding", "Electrical wiring", "Machine maintenance", "Quality inspection", "Basic programming"]},
+        {"name": "First Year Engineering", "skills": ["Engineering graphics", "Engineering mathematics", "C programming", "Python", "Basic electronics", "Workshop practice", "Lab experimentation"]}
+      ]
+    },
+    {
+      "name": "School of Computer Science & Engineering",
+      "departments": [
+        {"name": "Computer Engineering and Technology", "skills": ["Python", "Java", "C++", "JavaScript", "TypeScript", "Data structures and algorithms", "Frontend development", "Backend development", "React", "Node.js", "REST APIs", "SQL", "MongoDB", "Git and GitHub", "Machine learning", "Deep learning", "Data analysis", "Cloud computing", "AWS", "Docker", "Linux", "Computer networking", "Cybersecurity", "Ethical hacking", "Digital forensics", "Android development"]},
+        {"name": "Computer Science and Applications", "skills": ["Python", "Java", "JavaScript", "HTML and CSS", "React", "PHP", "Node.js", "Frontend development", "Backend development", "REST APIs", "SQL", "MongoDB", "Git and GitHub", "Software testing", "Android development", "Flutter", "Data analysis", "Data visualization", "Power BI", "Excel", "Web design", "WordPress", "Computer networking"]}
+      ]
+    },
+    {
+      "name": "Hafeez Contractor School of Architecture",
+      "departments": [],
+      "skills": ["Architectural design", "Architectural drawing", "AutoCAD", "Revit", "SketchUp", "Rhino", "3D rendering", "Hand sketching", "Model making", "Site planning", "Interior layout", "Adobe Photoshop", "Adobe InDesign", "Building codes"]
+    },
+    {
+      "name": "Hastak School of Construction Engineering and Management",
+      "departments": [],
+      "skills": ["Construction planning", "Project scheduling", "Primavera P6", "MS Project", "Cost estimation", "Quantity surveying", "Contract management", "BIM", "AutoCAD", "Revit", "Site safety", "Quality control", "Risk management", "Procurement"]
+    },
+    {
+      "name": "Ram Charan School of Leadership",
+      "departments": [],
+      "skills": ["Team leadership", "Strategic planning", "Decision making", "Coaching and mentoring", "Conflict management", "Negotiation", "Project management", "Entrepreneurship", "Business planning", "Stakeholder management", "Public speaking", "Change management"]
+    },
+    {
+      "name": "School of Business",
+      "departments": [
+        {"name": "Business", "skills": ["Digital marketing", "SEO", "Social media marketing", "Content marketing", "Email marketing", "Brand management", "Market research", "Sales", "Customer relationship management", "Financial analysis", "Excel", "Power BI", "Business analytics", "Recruitment", "Operations management", "Supply chain management", "Business plan writing", "Entrepreneurship", "Negotiation", "Project management"]},
+        {"name": "Hospitality Management", "skills": ["Front office operations", "Food and beverage service", "Culinary arts", "Banquet management", "Housekeeping operations", "Guest relations", "Event planning", "Food safety (HACCP)", "Tourism planning", "Customer service"]}
+      ]
+    },
+    {
+      "name": "School of Economics and Commerce",
+      "departments": [
+        {"name": "Commerce & Accounting", "skills": ["Tally", "Bookkeeping", "Financial accounting", "Cost accounting", "GST filing", "Income tax filing", "Auditing", "Financial reporting", "Budgeting", "Financial modelling", "Stock market analysis", "Excel"]},
+        {"name": "Economics", "skills": ["Econometrics", "STATA", "R", "Python", "Excel", "Statistical analysis", "Data analysis", "Data visualization", "Survey design", "Economic research", "Policy analysis", "Report writing"]}
+      ]
+    },
+    {
+      "name": "MIT School of Government",
+      "departments": [],
+      "skills": ["Public policy analysis", "Policy drafting", "Political research", "Legislative research", "Campaign management", "Voter awareness campaigns", "Civic engagement", "Community organizing", "Governance research", "Stakeholder engagement", "Debate", "Public speaking", "Report writing"]
+    },
+    {
+      "name": "School of Health Sciences & Technology",
+      "departments": [
+        {"name": "Pharmaceutical Sciences", "skills": ["Drug formulation", "Pharmacology", "Pharmaceutical analysis", "HPLC", "Quality control testing", "GMP compliance", "Regulatory documentation", "Pharmacovigilance", "Clinical trial coordination", "Patient counselling", "Pharmacy inventory"]},
+        {"name": "Public Health", "skills": ["Epidemiology", "Biostatistics", "SPSS", "Community health surveys", "Health education", "Health communication", "Health program planning", "Health camp organisation", "Nutrition awareness", "Sanitation and hygiene promotion", "Report writing"]},
+        {"name": "Wellness and Yogic Science", "skills": ["Yoga instruction", "Pranayama", "Meditation facilitation", "Yoga therapy basics", "Stress management coaching", "Nutrition counselling", "Wellness program planning", "Ayurveda basics"]},
+        {"name": "Clinical Sciences", "skills": ["First aid", "CPR and BLS", "Patient assessment", "Vital signs monitoring", "Basic diagnostics", "Clinical documentation", "Medical terminology", "Health informatics", "Counselling", "Psychological assessment"]}
+      ]
+    },
+    {
+      "name": "School of Science & Environmental Studies",
+      "departments": [
+        {"name": "Mathematics and Statistics", "skills": ["Python", "R", "MATLAB", "SPSS", "Excel", "SQL", "Statistical analysis", "Regression analysis", "Hypothesis testing", "Mathematical modelling", "Data cleaning", "Data visualization", "Machine learning", "Survey analysis"]},
+        {"name": "Biosciences and Technology", "skills": ["PCR", "Gel electrophoresis", "DNA extraction", "Cell culture", "Microbial culture", "Aseptic technique", "ELISA", "Microscopy", "Biochemical assays", "Bioinformatics", "Fermentation", "Lab safety", "Scientific writing"]},
+        {"name": "Physics", "skills": ["Python", "MATLAB", "LaTeX", "Data analysis", "Simulation", "Optics experiments", "Circuit building", "Oscilloscope use", "Spectroscopy", "Telescope operation", "Scientific writing"]},
+        {"name": "Chemistry", "skills": ["Organic synthesis", "Titration", "Chromatography", "HPLC", "Spectroscopy", "NMR", "Polymer chemistry", "Analytical chemistry", "Quality testing", "ChemDraw", "Lab safety"]},
+        {"name": "Environmental Studies", "skills": ["Environmental impact assessment", "QGIS", "GIS mapping", "Remote sensing", "Water quality testing", "Waste management", "Carbon footprint assessment", "Biodiversity surveys", "Climate data analysis", "Sustainability reporting", "Environmental awareness campaigns"]}
+      ]
+    },
+    {
+      "name": "School of Design",
+      "departments": [
+        {"name": "Design", "skills": ["Figma", "UI design", "UX research", "Wireframing", "Prototyping", "Graphic design", "Adobe Illustrator", "Adobe Photoshop", "Adobe InDesign", "Canva", "Typography", "Logo and brand design", "Poster design", "Product design", "3D modelling", "Blender", "Fashion illustration", "Interior design"]},
+        {"name": "Visual Arts", "skills": ["Illustration", "Sketching", "Drawing", "Painting", "Digital painting", "Procreate", "Mural painting", "Sculpture", "Printmaking", "2D animation", "Motion graphics", "After Effects", "Storyboarding", "Concept art"]}
+      ]
+    },
+    {
+      "name": "School of Liberal Arts",
+      "departments": [
+        {"name": "Liberal Arts", "skills": ["Academic writing", "Creative writing", "Editing and proofreading", "Research", "Critical analysis", "Interviewing", "Survey design", "Translation", "Debate", "Public speaking", "Psychology basics"]},
+        {"name": "Education", "skills": ["Teaching", "Tutoring", "Lesson planning", "Curriculum design", "Classroom management", "Assessment design", "Educational technology", "Special needs support", "Storytelling", "Workshop facilitation"]},
+        {"name": "Dadasaheb Phalke International Film School", "skills": ["Filmmaking", "Screenwriting", "Directing", "Cinematography", "Camera operation", "Video editing", "Premiere Pro", "DaVinci Resolve", "Colour grading", "Sound design", "Audio recording", "Documentary filmmaking", "Production management"]},
+        {"name": "Peace Studies", "skills": ["Conflict resolution", "Mediation", "Negotiation", "Facilitation", "Nonviolent communication", "Active listening", "Community dialogue", "Human rights awareness", "Social research", "NGO program coordination", "Peace education"]},
+        {"name": "Media and Communication", "skills": ["Content writing", "Copywriting", "Journalism", "News reporting", "Social media management", "Podcasting", "Video editing", "Public relations", "Press release writing", "Anchoring and hosting", "Scriptwriting", "Media planning"]}
+      ]
+    },
+    {
+      "name": "School of Law",
+      "departments": [],
+      "skills": ["Legal research", "Legal writing", "Legal drafting", "Contract drafting", "Case analysis", "Moot court", "Intellectual property basics", "Corporate law basics", "Cyber law basics", "Arbitration", "Legal aid", "Legal awareness camps", "Compliance"]
+    },
+    {
+      "name": "School of Consciousness",
+      "departments": [],
+      "skills": ["Meditation facilitation", "Mindfulness training", "Active listening", "Counselling basics", "Values education", "Group facilitation", "Self-development workshops", "Reflective practice"]
+    },
+    {
+      "name": "School of Photography",
+      "departments": [],
+      "skills": ["Photography", "Portrait photography", "Event photography", "Product photography", "Street photography", "Documentary photography", "Photojournalism", "Studio lighting", "Camera operation", "Adobe Lightroom", "Adobe Photoshop", "Photo retouching", "Videography", "Photo storytelling"]
+    }
+  ],
+  "general_skills": ["Communication", "Teamwork", "Leadership", "Problem solving", "Time management", "Public speaking", "Event planning", "Event anchoring", "Stage management", "Volunteer coordination", "Logistics planning", "Registration desk handling", "Crowd management", "Fundraising", "Sponsorship outreach", "Social media management", "Content writing", "Report writing", "Photography", "Video editing", "Canva", "Excel", "PowerPoint"],
+  "spoken_languages": ["English", "Hindi", "Marathi"]
+}

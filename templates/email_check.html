@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "macros.html" import toast %}
+
+{% block title %}Check your email · SkillMatch{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='account-email.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section class="account-email-panel" aria-labelledby="email-check-title">
+    <p class="eyebrow">One last step</p>
+    <h1 id="email-check-title">Check your email</h1>
+    <p class="account-email-intro">
+      {% if delivery_sent %}Your account has been created. Check your inbox to confirm your email before signing in.
+      {% else %}Your account has been created. Continue to sign in with your username.{% endif %}
+    </p>
+    <div class="account-email-feedback" aria-live="polite">
+      {% for category, message in get_flashed_messages(with_categories=true) %}
+        {{ toast(message, category) }}
+      {% endfor %}
+    </div>
+    {% if delivery_sent %}
+      <div class="account-email-note" role="status">
+        <strong>A verification message has been sent.</strong>
+        <p>Use the link in that message to confirm the address.</p>
+      </div>
+    {% endif %}
+    <nav class="account-email-links" aria-label="Next steps">
+      <a class="button button--primary" href="{{ url_for('auth.login') }}">Sign in</a>
+    </nav>
+  </section>
+{% endblock %}

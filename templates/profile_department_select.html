@@ -1,0 +1,52 @@
+<select id="dept" name="dept" required
+        autocomplete="organization"
+        aria-label="Department"
+        hx-post="{{ profile_skill_picker_url }}"
+        hx-trigger="change"
+        hx-vals='{"action":"department","skill_group":"department","skill_search":"","cross_skill_search":""}'
+        hx-target="#profile-skills-state"
+        hx-swap="outerHTML"
+        hx-include="#{{ profile_form_id }}">
+  <option value="" {% if not selected_department %}selected{% endif %}>
+    Select your department
+  </option>
+  {% if department_search and not profile_schools %}
+    <option value="" disabled>No matching departments</option>
+  {% endif %}
+  {% set known_departments = [] %}
+  {% for school in profile_schools %}
+    {% if not school.departments and school.name == selected_department %}
+      {% set _ = known_departments.append(school.name) %}
+    {% endif %}
+    {% for department in school.departments %}
+      {% if department.name == selected_department %}
+        {% set _ = known_departments.append(department.name) %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+  {% if selected_department and selected_department not in known_departments
+        and (department_needs_reselection or department_search) %}
+    <optgroup label="Current department">
+      <option value="{{ selected_department }}" selected>
+        {{ selected_department }}{% if department_needs_reselection %} — Please re-select your department{% endif %}
+      </option>
+    </optgroup>
+  {% endif %}
+  {% for school in profile_schools %}
+    <optgroup label="{{ school.name }}">
+      {% if school.departments %}
+        {% for department in school.departments %}
+          <option value="{{ department.name }}"
+                  {% if department.name == selected_department %}selected{% endif %}>
+            {{ department.name }}
+          </option>
+        {% endfor %}
+      {% else %}
+        <option value="{{ school.name }}"
+                {% if school.name == selected_department %}selected{% endif %}>
+          {{ school.name }}
+        </option>
+      {% endif %}
+    </optgroup>
+  {% endfor %}
+</select>

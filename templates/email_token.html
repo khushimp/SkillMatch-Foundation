@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "macros.html" import toast %}
+
+{% set is_verify = kind == 'verify' %}
+{% block title %}{% if is_verify %}Verify email{% else %}Choose a new password{% endif %} · SkillMatch{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='account-email.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section class="account-email-panel" aria-labelledby="token-title">
+    <p class="eyebrow">Account security</p>
+    {% if valid %}
+      <h1 id="token-title">{% if is_verify %}Confirm your email{% else %}Choose a new password{% endif %}</h1>
+      <p class="account-email-intro">
+        {% if is_verify %}
+          Confirm this address to finish verifying your account. Opening this page alone does not use the link.
+        {% else %}
+          Choose a password you have not used here before. Use at least 8 characters, including a digit and a special character.
+        {% endif %}
+      </p>
+      <div class="account-email-feedback" aria-live="polite">
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+          {{ toast(message, category) }}
+        {% endfor %}
+      </div>
+      {% if is_verify %}
+        <form class="account-email-form" method="post" action="{{ url_for('account_email.verify_email') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="token" value="{{ token }}">
+          <button class="button button--primary" type="submit">Verify email address</button>
+        </form>
+      {% else %}
+        <form class="account-email-form" method="post" action="{{ url_for('account_email.reset_password') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="token" value="{{ token }}">
+          <p>
+            <label for="new_password">New password</label>
+            <input id="new_password" name="new_password" type="password" autocomplete="new-password"
+                   required minlength="8" maxlength="1024" pattern="{{ password_pattern }}"
+                   title="Use at least 8 characters, including a digit and a special character.">
+          </p>
+          <p>
+            <label for="confirm_password">Confirm new password</label>
+            <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password"
+                   required minlength="8" maxlength="1024" pattern="{{ password_pattern }}"
+                   title="Use at least 8 characters, including a digit and a special character.">
+          </p>
+          <button class="button button--primary" type="submit">Reset password</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <h1 id="token-title">This link can’t be used</h1>
+      <p class="account-email-intro">The link may have expired or is invalid. Request a fresh one to continue.</p>
+      <nav class="account-email-links" aria-label="Request a fresh link">
+        {% if is_verify %}
+          <a class="button button--primary" href="{{ url_for('account_email.resend_verification') }}">Request a new verification link</a>
+        {% else %}
+          <a class="button button--primary" href="{{ url_for('account_email.forgot_password') }}">Request a new reset link</a>
+        {% endif %}
+        <a href="{{ url_for('auth.login') }}">Back to sign in</a>
+      </nav>
+    {% endif %}
+  </section>
+{% endblock %}

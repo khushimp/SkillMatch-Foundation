@@ -3,6 +3,10 @@
 
 {% block title %}Sign in · SkillMatch{% endblock %}
 
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='account-email.css') }}">
+{% endblock %}
+
 {% block content %}
   <section class="not-found-panel" aria-labelledby="login-title">
     <p class="eyebrow">Welcome back</p>
@@ -24,9 +28,9 @@
       <input type="hidden" name="next" value="{{ next_url or '' }}">
 
       <p>
-        <label for="username">Username</label><br>
+        <label for="username">Username or verified email</label><br>
         <input id="username" name="username" type="text" value="{{ username }}"
-               autocomplete="username" required maxlength="64">
+               autocomplete="username" required maxlength="254">
       </p>
       <p>
         <label for="password">Password</label><br>
@@ -36,6 +40,12 @@
       <button class="button button--primary" type="submit">Sign in</button>
     </form>
 
+    {% if account_email_delivery_ready %}
+      <nav class="account-email-links" aria-label="Account help">
+        <a href="{{ url_for('account_email.forgot_password') }}">Forgot password?</a>
+        <a href="{{ url_for('account_email.resend_verification') }}">Resend verification email</a>
+      </nav>
+    {% endif %}
     <p>New to SkillMatch? <a href="{{ url_for('auth.register') }}">Create an account</a>.</p>
   </section>
 {% endblock %}

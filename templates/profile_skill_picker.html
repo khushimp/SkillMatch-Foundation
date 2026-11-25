@@ -1,0 +1,102 @@
+<div id="profile-skills-state" class="profile-skill-picker">
+  <input type="hidden" name="skills" value="{{ profile_skills_string }}">
+  <div class="profile-skill-picker__heading">
+    <h2 id="profile-skills-label">Skills and ratings</h2>
+    <span>{{ profile_selected_skills|length }} / 15 selected</span>
+  </div>
+  {% if profile_skill_error %}
+    <p class="profile-form-error" role="alert">{{ profile_skill_error }}</p>
+  {% endif %}
+
+  <section aria-labelledby="selected-skills-label">
+    <h3 id="selected-skills-label">Selected skills</h3>
+    {% if profile_selected_skills %}
+      <ul class="profile-selected-skills">
+        {% for selected in profile_selected_skills %}
+          <li class="profile-selected-skill">
+            <strong class="profile-selected-skill__name">
+              {{ selected.name }}
+              {% if selected.is_custom %}<small class="profile-custom-skill__tag">Custom skill</small>{% endif %}
+              {% if selected.rating < 1 or selected.rating > 5 %}
+                <small class="profile-custom-skill__tag">
+                  Saved rating {{ selected.rating }}; choose a 1–5 rating to update it.
+                </small>
+              {% endif %}
+            </strong>
+            <div class="profile-rating-controls" role="group"
+                 aria-label="Rating for {{ selected.name }}">
+              {% for rating in range(1, 6) %}
+                <button type="button"
+                        class="profile-rating-button{% if rating == selected.rating %} is-selected{% endif %}"
+                        aria-label="Set {{ selected.name }} rating to {{ rating }}"
+                        aria-pressed="{{ 'true' if rating == selected.rating else 'false' }}"
+                        hx-post="{{ profile_skill_picker_url }}"
+                        hx-vals='{{ {"action": "rate", "skill": selected.name, "rating": rating}|tojson }}'
+                        hx-include="#{{ profile_form_id }}"
+                        hx-target="#profile-skills-state"
+                        hx-swap="outerHTML">{{ rating }}</button>
+              {% endfor %}
+            </div>
+            <button type="button" class="profile-remove-skill"
+                    aria-label="Remove {{ selected.name }}"
+                    hx-post="{{ profile_skill_picker_url }}"
+                    hx-vals='{{ {"action": "remove", "skill": selected.name}|tojson }}'
+                    hx-include="#{{ profile_form_id }}"
+                    hx-target="#profile-skills-state"
+                    hx-swap="outerHTML">Remove</button>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="profile-skill-help">Choose at least one skill using the dropdowns below.</p>
+    {% endif %}
+  </section>
+
+  <section class="profile-custom-skill" aria-labelledby="custom-skill-label">
+    <label id="custom-skill-label" for="custom-skill">Add custom skill</label>
+    <div class="profile-custom-skill__row">
+      <input id="custom-skill" name="custom_skill" type="text" maxlength="80"
+             placeholder="Skill not listed?">
+      <button type="button" class="button button--secondary"
+              hx-post="{{ profile_skill_picker_url }}"
+              hx-vals='{"action":"add_custom","skill_group":"custom"}'
+              hx-include="#{{ profile_form_id }}"
+              hx-target="#profile-skills-state"
+              hx-swap="outerHTML">Add custom skill</button>
+    </div>
+  </section>
+
+  <section class="profile-available-skills" aria-labelledby="available-skills-title">
+    <h3 id="available-skills-title">Choose from skill groups</h3>
+    <label for="skill-search">Search department and general skills</label>
+    <input id="skill-search" name="skill_search" type="search"
+           value="{{ profile_skill_search }}" placeholder="Search department and general skills"
+           hx-get="{{ profile_skill_picker_url }}"
+           hx-trigger="input changed delay:200ms, search"
+           hx-target="#available-skill-options"
+           hx-swap="innerHTML"
+           hx-vals='{{ {"skill_group": "department"}|tojson }}'
+           hx-params="dept,skills,skill_search,skill_group"
+           hx-include="#{{ profile_form_id }}">
+    <div id="available-skill-options">
+      {% include "profile_available_skills.html" %}
+    </div>
+  </section>
+
+  <section class="profile-available-skills" aria-labelledby="cross-department-skills-title">
+      <h3 id="cross-department-skills-title">Cross-department skills</h3>
+      <label for="cross-skill-search">Search skills from other departments</label>
+      <input id="cross-skill-search" name="cross_skill_search" type="search"
+             value="{{ profile_cross_skill_search }}" placeholder="Search other departments"
+             hx-get="{{ profile_skill_picker_url }}"
+             hx-trigger="input changed delay:200ms, search"
+             hx-target="#cross-department-skill-options"
+             hx-swap="innerHTML"
+             hx-vals='{{ {"skill_group": "cross"}|tojson }}'
+             hx-params="dept,skills,cross_skill_search,skill_group"
+             hx-include="#{{ profile_form_id }}">
+      <div id="cross-department-skill-options">
+        {% include "profile_cross_department_skills.html" %}
+      </div>
+  </section>
+</div>

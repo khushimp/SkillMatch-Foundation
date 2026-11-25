@@ -3,6 +3,12 @@
 
 {% block title %}{% if editing %}Edit profile{% else %}Your profile{% endif %} · SkillMatch{% endblock %}
 
+{% block extra_css %}
+  {% if editing and not is_organizer %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='profile-skills.css') }}">
+  {% endif %}
+{% endblock %}
+
 {% block content %}
   <section class="not-found-panel profile-panel" aria-labelledby="profile-title">
     <p class="eyebrow">{{ user.role }}</p>
@@ -24,11 +30,17 @@
 
     {% if editing %}
       <form method="post"
+            id="profile-edit-form"
             action="{{ url_for('auth.edit_profile') }}"
             hx-post="{{ url_for('auth.edit_profile') }}"
-            hx-target="#profile-message"
+            hx-target="#profile-form-feedback"
             hx-swap="innerHTML">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div id="profile-form-feedback" aria-live="polite">
+          {% for field, message in form_errors.items() %}
+            <p class="profile-form-error" role="alert">{{ field|title }}: {{ message }}</p>
+          {% endfor %}
+        </div>
         <p>
           <label for="name">Full name</label><br>
           <input id="name" name="name" type="text" value="{{ form_data.name }}"
@@ -37,17 +49,35 @@
         {% if is_organizer %}
           <p><small>Organizer profiles don’t need a department or skills.</small></p>
         {% else %}
-          <p>
-            <label for="dept">Department</label><br>
-            <input id="dept" name="dept" type="text" value="{{ form_data.dept }}"
-                   autocomplete="organization" maxlength="100" required>
-          </p>
-          <p>
-            <label for="skills">Skills and ratings</label><br>
-            <textarea id="skills" name="skills" rows="3" required
-                      placeholder="Photography:4, Event planning:3">{{ form_data.skills }}</textarea>
-            <br><small>Required for student volunteers. Separate entries with commas; ratings are whole numbers starting at 0.</small>
-          </p>
+          <section class="profile-skills-editor" aria-labelledby="profile-department-label">
+            <label id="profile-department-label" for="department-search">Department</label>
+            <input id="department-search" name="department_search" type="search"
+                   placeholder="Search departments"
+                   aria-label="Search departments"
+                   hx-get="{{ url_for('auth.profile_department_options') }}"
+                   hx-trigger="input changed delay:250ms, search"
+                   hx-target="#dept" hx-swap="outerHTML"
+                   hx-params="dept,department_search"
+                   hx-include="#profile-edit-form">
+            {% include "profile_department_select.html" %}
+            {% if form_errors.get("dept") %}
+              <p class="profile-form-error" role="alert">{{ form_errors.dept }}</p>
+            {% endif %}
+
+            {% with
+              profile_department=form_data.dept,
+              profile_skills_string=form_data.skills
+            %}
+              {% include "profile_skill_picker.html" %}
+            {% endwith %}
+            {% if form_errors.get("skills") %}
+              <p class="profile-form-error" role="alert">{{ form_errors.skills }}</p>
+            {% endif %}
+            <p class="profile-rating-legend">
+              <strong>Rating:</strong> 1 = Beginner, 2 = Basic, 3 = Intermediate,
+              4 = Advanced, 5 = Expert.
+            </p>
+          </section>
         {% endif %}
         <button class="button button--primary" type="submit">Save profile</button>
         <a class="button button--secondary" href="{{ url_for('auth.profile') }}">Cancel</a>
@@ -58,17 +88,48 @@
         <dd>{{ user.username }}</dd>
         {% if not is_organizer %}
           <dt>Department</dt>
-          <dd>{{ user.dept or "Not added yet" }}</dd>
+          <dd>
+            {{ user.dept or "Not added yet" }}
+            {% if department_needs_reselection %}
+              <span class="profile-form-error">— Please re-select your department</span>
+            {% endif %}
         {% endif %}
       </dl>
+
+      {% if prismlabs_participation %}
+        <section class="team-card" aria-labelledby="prismlabs-profile-title">
+          <h2 id="prismlabs-profile-title">PrismLabs event participation</h2>
+          <p><strong>PRN:</strong> {{ prismlabs_participation.volunteer.prn }}</p>
+          <p><strong>Roster email:</strong> {{ prismlabs_participation.volunteer.email }}</p>
+          <p><strong>Academic year:</strong> {{ prismlabs_participation.volunteer.academic_year }}</p>
+          <p><strong>Roster department:</strong> {{ prismlabs_participation.volunteer.department }}</p>
+          <p><strong>Interested areas:</strong> {{ prismlabs_participation.volunteer.interested_areas|join(", ") }}</p>
+          <p><strong>Event:</strong> {{ prismlabs_participation.event.name }}</p>
+          <p><strong>Date:</strong> {{ prismlabs_participation.event.date or "Not recorded" }}</p>
+          <p><strong>Hours:</strong> {{ prismlabs_participation.participant.hours if prismlabs_participation.participant.hours else "N/A" }}</p>
+          {% if prismlabs_participation.certificate %}
+            <p><strong>Verification code:</strong> <code>{{ prismlabs_participation.certificate.certificate_id }}</code></p>
+            <p>
+              <a class="button button--primary"
+                 href="{{ url_for('prismlabs.volunteer_certificate_pdf') }}">Download certificate</a>
+            </p>
+            <p>
+              <a href="{{ url_for('certificates.verify_prismlabs_certificate', certificate_id=prismlabs_participation.certificate.certificate_id) }}">Verify certificate</a>
+            </p>
+          {% endif %}
+        </section>
+      {% endif %}
 
       {% if not is_organizer %}
         <section aria-labelledby="skills-title">
           <h2 id="skills-title">Skills</h2>
           {% if skill_items %}
             <ul>
-              {% for skill, rating in skill_items %}
-                <li>{{ skill }} · rating {{ rating }}</li>
+              {% for skill, rating, is_custom in skill_items %}
+                <li>
+                  {{ skill }} · rating {{ rating }}
+                  {% if is_custom %}<small>(Custom skill)</small>{% endif %}
+                </li>
               {% endfor %}
             </ul>
           {% else %}
@@ -78,6 +139,87 @@
       {% endif %}
 
       {% if user.role == "Student Volunteer" %}
+        <section class="skill-passport" aria-labelledby="skill-passport-title">
+          <header class="skill-passport__header">
+            <p class="eyebrow">Private to you</p>
+            <h2 id="skill-passport-title">Verified Skill Passport</h2>
+            <p>
+              Evidence comes from required event skills, a completed event,
+              your assigned role, and organizer-recorded attendance or hours.
+              Self-reported skills alone are not verified.
+            </p>
+          </header>
+          {% if skill_passport_error %}
+            {{ toast(skill_passport_error, "error") }}
+          {% elif skill_passport %}
+            <div class="skill-passport__summary" aria-label="Passport summary">
+              <div>
+                <strong>{{ skill_passport.completed_event_count }}</strong>
+                <span>completed contributions</span>
+              </div>
+              <div>
+                <strong>{{ skill_passport.total_hours|format_decimal }}</strong>
+                <span>organizer-recorded hours</span>
+              </div>
+              <div>
+                <strong>{{ skill_passport.verified_skills|length }}</strong>
+                <span>verified skills</span>
+              </div>
+            </div>
+
+            {% if skill_passport.verified_skills %}
+              <h3>Skills with event evidence</h3>
+              <div class="skill-passport__skills">
+                {% for skill in skill_passport.verified_skills %}
+                  <article class="skill-passport__skill">
+                    <h4>{{ skill.name }}</h4>
+                    <ul class="skill-passport__evidence">
+                      {% for evidence in skill.evidence %}
+                        <li>
+                          <strong>
+                            {% if evidence.event_linkable %}
+                              <a href="{{ url_for('events.event_detail', event_id=evidence.event_id) }}">{{ evidence.event_name }}</a>
+                            {% else %}
+                              {{ evidence.event_name }}
+                            {% endif %}
+                          </strong>
+                          <span>{{ evidence.role }} · {{ evidence.hours|format_decimal }} hours</span>
+                          {% if evidence.certificate_code %}
+                            <a href="{{ url_for('certificates.download', verification_code=evidence.certificate_code) }}">Download certificate</a>
+                          {% endif %}
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </article>
+                {% endfor %}
+              </div>
+            {% else %}
+              {{ empty_state("Verified skills will appear after a completed event has organizer-recorded attendance or hours and an assigned role.", "Discover events", url_for("events.discover")) }}
+            {% endif %}
+
+            {% if skill_passport.contributions %}
+              <details class="skill-passport__contributions">
+                <summary>View completed event contributions</summary>
+                <ul>
+                  {% for item in skill_passport.contributions %}
+                    <li>
+                      {% if item.event_linkable %}
+                        <a href="{{ url_for('events.event_detail', event_id=item.event_id) }}">{{ item.event_name }}</a>
+                      {% else %}
+                        {{ item.event_name }}
+                      {% endif %}
+                      — {{ item.role }}, {{ item.hours|format_decimal }} hours
+                      {% if item.certificate_code %}
+                        · <a href="{{ url_for('certificates.download', verification_code=item.certificate_code) }}">Certificate</a>
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endif %}
+          {% endif %}
+        </section>
+
         <section class="volunteer-recognition" aria-labelledby="volunteer-recognition-title">
           <h2 id="volunteer-recognition-title">Volunteer badges</h2>
           {% if volunteer_badge_error %}
@@ -103,7 +245,11 @@
         </section>
       {% endif %}
 
-      <p><a class="button button--primary" href="{{ url_for('auth.edit_profile') }}">Edit profile</a></p>
+      <p class="profile-actions">
+        <a class="button button--primary" href="{{ url_for('auth.edit_profile') }}">Edit profile</a>
+        <a class="button button--secondary" href="{{ url_for('account_email.settings') }}">Private email settings</a>
+        <a class="button button--secondary" href="{{ url_for('account_email.confirm_delete_account') }}">Delete account</a>
+      </p>
       <form method="post"
             action="{{ url_for('auth.logout') }}"
             hx-post="{{ url_for('auth.logout') }}"

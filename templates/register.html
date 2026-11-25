@@ -3,6 +3,10 @@
 
 {% block title %}Create account · SkillMatch{% endblock %}
 
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='profile-skills.css') }}">
+{% endblock %}
+
 {% block content %}
   <section class="not-found-panel" aria-labelledby="register-title">
     <p class="eyebrow">Join your campus community</p>
@@ -16,6 +20,7 @@
     </div>
 
     <form method="post"
+          id="registration-form"
           action="{{ url_for('auth.register') }}"
           hx-post="{{ url_for('auth.register') }}"
           hx-target="#auth-message"
@@ -25,13 +30,20 @@
       <p>
         <label for="name">Full name</label><br>
         <input id="name" name="name" type="text" value="{{ form_data.get('name', '') }}"
-               autocomplete="name" required maxlength="100">
+               autocomplete="name" required maxlength="100"
+               pattern="[\p{L} ]+" title="Use letters and spaces only.">
       </p>
       <p>
         <label for="username">Username</label><br>
         <input id="username" name="username" type="text"
                value="{{ form_data.get('username', '') }}"
                autocomplete="username" required maxlength="64">
+      </p>
+      <p>
+        <label for="email">Email address</label><br>
+        <input id="email" name="email" type="email" value="{{ form_data.get('email', '') }}"
+               autocomplete="email" required maxlength="254">
+        <br><small>Use your MIT-WPU email ending in @mitwpu.edu.in. It stays private to your account.</small>
       </p>
       <p>
         <label for="role">I’m joining as</label><br>
@@ -50,7 +62,6 @@
           </option>
         </select>
       </p>
-      {% set selected_role = form_data.get('role', 'Student Volunteer') %}
       {% include "registration_fields.html" %}
       <p>
         <label for="password">Password</label><br>
@@ -59,6 +70,13 @@
                pattern="{{ password_pattern }}"
                title="Use at least 8 characters, including a digit and a special character.">
         <br><small>Use at least 8 characters, including one digit and one special character.</small>
+      </p>
+      <p>
+        <label for="confirm-password">Confirm password</label><br>
+        <input id="confirm-password" name="confirm_password" type="password"
+               autocomplete="new-password" required minlength="8" maxlength="1024"
+               pattern="{{ password_pattern }}"
+               title="Enter the same password again.">
       </p>
       <button class="button button--primary" type="submit">Create account</button>
     </form>

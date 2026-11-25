@@ -1,0 +1,13 @@
+{% set selected_names = profile_selected_skills|map(attribute="name")|map("lower")|list %}
+<select id="cross-department-skill" name="cross_skill" aria-label="Cross-department skills"
+        hx-post="{{ profile_skill_picker_url }}" hx-trigger="change"
+        hx-vals='{"action":"add_skill","skill_group":"cross"}'
+        hx-include="#{{ profile_form_id }}" hx-target="#profile-skills-state" hx-swap="outerHTML">
+  <option value="">Select a skill from another department</option>
+  {% for skill in profile_cross_department_skills %}
+    <option value="{{ skill }}" {% if skill|lower in selected_names %}disabled{% endif %}>{{ skill }}{% if skill|lower in selected_names %} · Added{% endif %}</option>
+  {% endfor %}
+</select>
+{% if not profile_cross_department_skills %}
+  <p class="profile-skill-help">No matching skills from other departments.</p>
+{% endif %}

@@ -6,7 +6,8 @@ from typing import Any
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from data_store import load, save
+from data_store import edit_documents, load
+from account_service import DUPLICATE_EMAIL, email_available, validate_mitwpu_email
 
 
 USERS_FILE = "users.json"
@@ -44,8 +45,13 @@ def register_user(
     name: str,
     dept: str | None = None,
     skills: Mapping[str, Any] | None = None,
+    email: str | None = None,
+    require_verification: bool = True,
 ) -> tuple[bool, str]:
-    """Validate and save a new account with a one-way password hash."""
+    """Save a hashed account; email-less calls are for legacy/imported accounts.
+
+    The public registration route always validates and supplies an email.
+    """
     username = username.strip() if isinstance(username, str) else ""
     name = name.strip() if isinstance(name, str) else ""
     role = role.strip() if isinstance(role, str) else ""
@@ -77,20 +83,37 @@ def register_user(
         if not cleaned_skills:
             return False, "Add at least one skill to your volunteer profile."
 
-    users = load(USERS_FILE)
-    if not isinstance(users, dict):
-        raise ValueError("users.json must contain a JSON object keyed by username.")
-    if username in users:
-        return False, "That username is already registered."
-
-    users[username] = {
-        "password_hash": generate_password_hash(password),
-        "role": role,
-        "name": name,
-        "dept": dept or None,
-        "skills": cleaned_skills,
-    }
-    save(USERS_FILE, users)
+    if email is not None:
+        try:
+            email = validate_mitwpu_email(email)
+        except ValueError as error:
+            return False, str(error)
+    password_hash = generate_password_hash(password)
+    with edit_documents(USERS_FILE) as docs:
+        users = docs[USERS_FILE]
+        if not isinstance(users, dict):
+            raise ValueError("users.json must contain a JSON object keyed by username.")
+        if username in users or any(
+            isinstance(user, dict) and (
+                username.casefold() in {user.get("email"), user.get("pending_email")}
+                or ("@" in username and existing.casefold() == username.casefold())
+            )
+            for existing, user in users.items()
+        ):
+            return False, "That username is already registered."
+        if email is not None and not email_available(users, email, excluding=username):
+            return False, DUPLICATE_EMAIL
+        users[username] = {
+            "password_hash": password_hash,
+            "role": role,
+            "name": name,
+            "dept": dept or None,
+            "skills": cleaned_skills,
+        }
+        if email is not None:
+            users[username].update(
+                email=email, email_verified=False, verification_required=require_verification,
+            )
     return True, "Your account has been created."
 
 
@@ -104,7 +127,19 @@ def login_user(username: str, password: str) -> dict[str, Any] | None:
     if not isinstance(users, dict):
         raise ValueError("users.json must contain a JSON object keyed by username.")
     user = users.get(username)
+    canonical_username = username
+    if user is None and "@" in username:
+        for candidate, account in users.items():
+            if (
+                isinstance(account, dict) and account.get("email_verified")
+                and account.get("email") == username.casefold()
+            ):
+                user = account
+                canonical_username = candidate
+                break
     if not isinstance(user, dict):
+        return None
+    if user.get("account_deleted_at"):
         return None
 
     password_hash = user.get("password_hash")
@@ -112,7 +147,7 @@ def login_user(username: str, password: str) -> dict[str, Any] | None:
         return None
     try:
         if check_password_hash(password_hash, password):
-            return dict(user)
+            return {**user, "username": canonical_username}
     except (TypeError, ValueError):
         return None
     return None

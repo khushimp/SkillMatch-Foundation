@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "macros.html" import toast %}
+
+{% set is_reset = kind == 'reset' %}
+{% block title %}{% if is_reset %}Reset password{% else %}Resend verification{% endif %} · SkillMatch{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='account-email.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section class="account-email-panel" aria-labelledby="request-title">
+    <p class="eyebrow">Account help</p>
+    <h1 id="request-title">{% if is_reset %}Reset your password{% else %}Verify your email{% endif %}</h1>
+    <p class="account-email-intro">
+      {% if is_reset %}
+        Enter the address associated with your account. If it can be matched, we’ll send a password reset link.
+      {% else %}
+        Enter the address associated with your account. If it can be matched, we’ll send a fresh verification link.
+      {% endif %}
+    </p>
+
+    <div class="account-email-feedback" aria-live="polite">
+      {% for category, message in get_flashed_messages(with_categories=true) %}
+        {{ toast(message, category) }}
+      {% endfor %}
+    </div>
+
+    {% if submitted %}
+      <div class="account-email-note" role="status">
+        <strong>If an account matches that address, a message will be sent.</strong>
+        <p>For privacy, this response is the same whether or not an account exists.</p>
+      </div>
+    {% endif %}
+    <form class="account-email-form" method="post"
+          action="{% if is_reset %}{{ url_for('account_email.forgot_password') }}{% else %}{{ url_for('account_email.resend_verification') }}{% endif %}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <p>
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email" autocomplete="email" maxlength="254" required>
+      </p>
+      <button class="button button--primary" type="submit">
+        {% if is_reset %}Send reset link{% else %}Send verification link{% endif %}
+      </button>
+    </form>
+
+    <p class="account-email-expiry">
+      {% if is_reset %}Password reset links expire after 1 hour.{% else %}Verification links expire after 24 hours.{% endif %}
+    </p>
+    <nav class="account-email-links" aria-label="More account options">
+      <a href="{{ url_for('auth.login') }}">Back to sign in</a>
+      <a href="{{ url_for('account_email.settings') }}">Email settings for existing accounts</a>
+    </nav>
+  </section>
+{% endblock %}

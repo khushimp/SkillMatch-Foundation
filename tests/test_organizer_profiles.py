@@ -33,8 +33,10 @@ class OrganizerProfileTests(unittest.TestCase):
     def test_organizer_signup_ignores_department_and_skills_on_server(self):
         response = self.client.post("/register", data={
             "username": "organizer",
+            "email": "organizer@mitwpu.edu.in",
             "name": "Organizer One",
             "password": "safe-pass1",
+            "confirm_password": "safe-pass1",
             "role": "Organizer",
             "dept": "Ignore this",
             "skills": "not a valid skill list",
@@ -53,6 +55,35 @@ class OrganizerProfileTests(unittest.TestCase):
         self.assertNotIn(b'name="skills"', editing.data)
         self.assertEqual(self.client.get("/dashboard").status_code, 200)
         self.assertEqual(self.client.get("/events/discover").status_code, 200)
+
+    def test_registration_full_name_accepts_letters_and_spaces_only(self):
+        page = self.client.get("/register")
+        self.assertIn(b'pattern="[\\p{L} ]+"', page.data)
+
+        for invalid_name in ("Student 2", "Student-One", "Student!"):
+            response = self.client.post("/register", data={
+                "username": f"invalid-{invalid_name}",
+                "email": "name-check@mitwpu.edu.in",
+                "name": invalid_name,
+                "password": "safe-pass1",
+                "confirm_password": "safe-pass1",
+                "role": "Organizer",
+                "csrf_token": self.csrf,
+            })
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b"letters and spaces only", response.data)
+
+        accepted = self.client.post("/register", data={
+            "username": "valid-name",
+            "email": "valid-name@mitwpu.edu.in",
+            "name": "Aditi Sharma",
+            "password": "safe-pass1",
+            "confirm_password": "safe-pass1",
+            "role": "Organizer",
+            "csrf_token": self.csrf,
+        })
+        self.assertEqual(accepted.status_code, 302)
+        self.assertEqual(data_store.load("users.json")["valid-name"]["name"], "Aditi Sharma")
 
     def test_role_change_returns_only_applicable_fields_without_javascript(self):
         organizer = self.client.get("/register/profile-fields?role=Organizer")
@@ -75,8 +106,10 @@ class OrganizerProfileTests(unittest.TestCase):
         self.assertIn(b'pattern="(?=.*[0-9])(?=.*[^A-Za-z0-9\\s]).{8,1024}"', response.data)
         rejected = self.client.post("/register", data={
             "username": "bad-password",
+            "email": "bad-password@mitwpu.edu.in",
             "name": "Student One",
             "password": "password1",
+            "confirm_password": "password1",
             "role": "Organizer",
             "csrf_token": self.csrf,
         })
