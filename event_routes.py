@@ -5,28 +5,78 @@ from datetime import datetime, timezone
 from flask import Blueprint, abort, g, redirect, render_template, request, url_for
 
 from auth_routes import _login_required, _require_csrf
-from auth_service import check_eligibility
 from data_store import load
 from event_service import (
     APPLICATIONS_FILE,
     EVENTS_FILE,
     _as_utc_datetime,
     apply_to_event,
+    event_card_data,
     find_eligible_events,
     get_apply_status,
     get_badges,
+    get_event_eligibility_reason,
     get_saved_event_ids,
     toggle_saved_event as toggle_saved_event_service,
+)
+from prismlabs_service import (
+    EVENT_ID as PRISMLABS_EVENT_ID,
+    ensure_seeded as ensure_prismlabs_seeded,
+    public_event as get_prismlabs_event,
 )
 
 
 events_bp = Blueprint("events", __name__, url_prefix="/events")
 
 
+def _matches_past_event_filters(event_id, event, filters):
+    search_text = " ".join(str(event.get(key) or "") for key in (
+        "name", "description", "organizer"
+    )).casefold()
+    if filters["search"] and filters["search"].casefold() not in f"{event_id} {search_text}":
+        return False
+    if filters["skill"] and not any(
+        filters["skill"].casefold() in name.casefold()
+        for name in event.get("required_skills", {})
+    ):
+        return False
+    if filters["department"]:
+        departments = event.get("departments")
+        if isinstance(departments, list):
+            if departments and not any(
+                isinstance(value, str)
+                and value.casefold() == filters["department"].casefold()
+                for value in departments
+            ):
+                return False
+        elif filters["department"].casefold() != str(event.get("department") or "").casefold():
+            return False
+    if filters["type"] and filters["type"].casefold() != str(event.get("type") or "").casefold():
+        return False
+    return not filters["date"] or str(event.get("date") or "").startswith(filters["date"])
+
+
+def _seats_left(event, event_applications):
+    """Count accepted applications consistently for cards and event details."""
+    if not isinstance(event_applications, dict) or any(
+        not isinstance(application, dict) for application in event_applications.values()
+    ):
+        raise ValueError("Event applications must contain application objects.")
+    capacity = event.get("slots_needed")
+    if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity <= 0:
+        raise ValueError("The event must have a positive slots_needed value.")
+    accepted_count = sum(
+        isinstance(application.get("status"), str)
+        and application["status"].casefold() == "accepted"
+        for application in event_applications.values()
+    )
+    return max(0, capacity - accepted_count)
+
+
 @events_bp.get("/discover")
 @_login_required
 def discover():
-    """Show eligible events and return only event cards for HTMX requests."""
+    """Show open events to all signed-in users and return cards for HTMX requests."""
     filters = {
         "search": request.args.get("search", "").strip(),
         "skill": request.args.get("skill", "").strip(),
@@ -37,15 +87,49 @@ def discover():
     user = g.current_user
     matches = find_eligible_events(user, **filters)
     saved_event_ids = set(get_saved_event_ids(user["username"]))
-    event_cards = [
-        {
+    applications = load(APPLICATIONS_FILE)
+    if not isinstance(applications, dict):
+        raise ValueError("applications.json must contain an object keyed by event ID.")
+    event_cards = []
+    for event_id, event in matches:
+        seats_left = _seats_left(event, applications.get(event_id, {}))
+        event_cards.append({
             "event_id": event_id,
             "event": event,
-            "badges": get_badges(event, user),
+            "seats_left": seats_left,
+            "card_data": event_card_data(
+                {**event, "seats_left": seats_left},
+                user.get("skills", {})
+                if user.get("role") == "Student Volunteer"
+                else {},
+            ),
+            "badges": get_badges({**event, "seats_left": seats_left}, user),
             "is_saved": event_id in saved_event_ids,
-        }
-        for event_id, event in matches
-    ]
+            "eligibility_reason": get_event_eligibility_reason(user, event),
+        })
+    prism_event = load(EVENTS_FILE).get(PRISMLABS_EVENT_ID)
+    if (
+        isinstance(prism_event, dict)
+        and prism_event.get("source") == "prismlabs"
+        and _matches_past_event_filters(PRISMLABS_EVENT_ID, prism_event, filters)
+    ):
+        event_id = PRISMLABS_EVENT_ID
+        event = prism_event
+        event_cards.append({
+            "event_id": event_id,
+            "event": event,
+            "seats_left": 0,
+            "card_data": event_card_data(
+                {**event, "seats_left": 0},
+                user.get("skills", {}) if user.get("role") == "Student Volunteer" else {},
+            ),
+            "badges": ["Completed"],
+            "is_saved": event_id in saved_event_ids,
+            "eligibility_reason": (
+                None if user["username"] in applications.get(event_id, {})
+                else "This event has been completed."
+            ),
+        })
 
     return render_template(
         "discover.html",
@@ -57,6 +141,8 @@ def discover():
 
 def _detail_context(event_id):
     """Load public event information and application availability for this user."""
+    if event_id == PRISMLABS_EVENT_ID:
+        ensure_prismlabs_seeded()
     events = load(EVENTS_FILE)
     if not isinstance(events, dict):
         raise ValueError("events.json must contain an object keyed by event ID.")
@@ -65,45 +151,49 @@ def _detail_context(event_id):
     event = events[event_id]
     if not isinstance(event, dict):
         raise ValueError("The event record must be an object.")
+    if event.get("deleted_at"):
+        abort(404)
 
     applications = load(APPLICATIONS_FILE)
     if not isinstance(applications, dict):
         raise ValueError("applications.json must contain an object keyed by event ID.")
     event_applications = applications.get(event_id, {})
-    if not isinstance(event_applications, dict) or any(
-        not isinstance(application, dict)
-        for application in event_applications.values()
-    ):
-        raise ValueError("Event applications must contain application objects.")
-    accepted_count = sum(
-        isinstance(application.get("status"), str)
-        and application["status"].casefold() == "accepted"
-        for application in event_applications.values()
-    )
-    capacity = event.get("slots_needed")
-    if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity <= 0:
-        raise ValueError("The event must have a positive slots_needed value.")
-    seats_left = max(0, capacity - accepted_count)
+    seats_left = 0 if event.get("source") == "prismlabs" else _seats_left(event, event_applications)
     status = get_apply_status(g.current_user["username"], event_id)
     ends_at = _as_utc_datetime(event.get("ends_at"))
     blocked_reason = None
     if status == "Apply":
-        if event.get("status") != "open":
+        if g.current_user.get("role") != "Student Volunteer":
+            blocked_reason = "Only student volunteers can apply."
+        elif event.get("status") != "open":
             blocked_reason = "This event is not open for applications."
         elif ends_at is not None and ends_at <= datetime.now(timezone.utc):
             blocked_reason = "This event has already ended."
         elif seats_left == 0:
             blocked_reason = "This event is full."
-        elif not check_eligibility(
-            g.current_user.get("skills", {}), event.get("required_skills", {})
-        ):
-            blocked_reason = "Your skills do not meet this event's requirements."
+        else:
+            blocked_reason = get_event_eligibility_reason(g.current_user, event)
 
     return {
         "event_id": event_id,
         "event": event,
+        "card_data": event_card_data(
+            {**event, "seats_left": seats_left},
+            g.current_user.get("skills", {})
+            if g.current_user.get("role") == "Student Volunteer"
+            else {},
+        ),
+        "duration_display": (
+            event.get("duration_hours")
+            if isinstance(event.get("duration_hours"), (int, float))
+            else None
+        ),
         "seats_left": seats_left,
-        "badges": get_badges({**event, "seats_left": seats_left}, g.current_user),
+        "badges": (
+            ["Completed"] if event.get("source") == "prismlabs"
+            else get_badges({**event, "seats_left": seats_left}, g.current_user)
+        ),
+        "prism_event": get_prismlabs_event() if event.get("source") == "prismlabs" else None,
         "apply_status": status,
         "blocked_reason": blocked_reason,
         "is_saved": event_id in get_saved_event_ids(g.current_user["username"]),

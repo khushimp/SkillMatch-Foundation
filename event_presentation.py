@@ -1,4 +1,4 @@
-"""Additive event category defaults and safe optional image URLs."""
+"""Event categories and safe, organizer-selected optional image URLs."""
 
 import re
 from collections.abc import Mapping
@@ -7,17 +7,6 @@ from urllib.parse import urlsplit
 from certificate_themes import CERTIFICATE_THEMES, DEFAULT_CATEGORY
 
 EVENT_CATEGORIES = tuple(CERTIFICATE_THEMES)
-DEFAULT_EVENT_IMAGES = {
-    "Environment": "environment.jpg",
-    "Education": "education.jpg",
-    "Health": "health.jpg",
-    "Community Service": "community-service.jpg",
-    "Tech": "tech.jpg",
-    "Arts": "arts.jpg",
-    "Sports/Fitness": "sports-fitness.jpg",
-    "Animal Welfare": "animal-welfare.jpg",
-    "Fundraising": "fundraising.jpg",
-}
 _CATEGORY_KEYWORDS = (
     ("Animal Welfare", ("animal", "shelter", "pet care", "dog rescue")),
     ("Fundraising", ("fundrais", "charity", "donation")),
@@ -84,9 +73,6 @@ def event_visual(event):
         "slug": re.sub(r"[^a-z0-9]+", "-", category.casefold()).strip("-"),
         "image_url": image_url,
         "alt": f"{event.get('name') or event.get('event_name') or 'Campus event'} — {category}",
-        "default_image_url": (
-            f"/static/images/events/{DEFAULT_EVENT_IMAGES[category]}"
-            if category in DEFAULT_EVENT_IMAGES else ""
-        ),
-        "default_alt": f"Stock photo representing {category} volunteering",
+        "default_image_url": "",
+        "default_alt": "",
     }

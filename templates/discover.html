@@ -21,9 +21,20 @@
               <div class="event-card__meta">
                 <span class="event-card__meta-chip">Organizer: {{ event.organizer }}</span>
                 <span class="event-card__meta-chip">{{ event_visual(event).category }}</span>
-                {% set event_department = event.get("department", event.get("dept")) %}
-                {% if event_department %}
-                  <span class="event-card__meta-chip">{{ event_department }}</span>
+                {% set event_departments = event.get("departments") %}
+                {% if event_departments is not none %}
+                  {% if event_departments %}
+                    {% for department in event_departments %}
+                      <span class="event-card__meta-chip">{{ department }}</span>
+                    {% endfor %}
+                  {% else %}
+                    <span class="event-card__meta-chip">All departments</span>
+                  {% endif %}
+                {% else %}
+                  {% set event_department = event.get("department", event.get("dept")) %}
+                  {% if event_department %}
+                    <span class="event-card__meta-chip">{{ event_department }}</span>
+                  {% endif %}
                 {% endif %}
                 {% set event_type = event.get("type", event.get("event_type")) %}
                 {% if event_type %}
