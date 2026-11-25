@@ -7,9 +7,21 @@ import re
 import secrets
 import string
 from typing import Any
+from xml.etree import ElementTree
 
 from data_store import load, save
 from formatting import format_decimal
+from notification_service import add_notifications
+from certificate_themes import CERTIFICATE_THEMES, get_certificate_theme
+from event_presentation import event_category
+from reportlab.lib.colors import Color, HexColor
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen.canvas import Canvas
+from reportlab.graphics import renderPDF
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.svgpath import SvgPath
 
 
 EVENTS_FILE = "events.json"
@@ -174,38 +186,159 @@ def _pdf_text_command(
     )
 
 
+def _draw_theme_emblem(pdf: Canvas, theme: Mapping[str, Any]) -> None:
+    """Render our trusted inline SVG paths as vectors, with no files or extra dependencies."""
+    root = ElementTree.fromstring(theme["emblem_svg"])
+    drawing = Drawing(24, 24)
+    for element in root.iter():
+        if element.tag.rsplit("}", 1)[-1] != "path":
+            continue
+        drawing.add(SvgPath(
+            element.attrib["d"],
+            fillColor=None,
+            strokeColor=HexColor(theme["primary"]),
+            strokeWidth=1.4,
+        ))
+    renderPDF.draw(drawing, pdf, 418, 544)
+
+
 def _render_certificate_pdf(
     volunteer_name: str,
     event_name: str,
-    hours: int | float,
-    verification_code: str,
+    hours: int | float | None,
     event_date: str | None = None,
     issue_date: str | None = None,
+    volunteer_role: str | None = None,
+    organizer_name: str | None = None,
+    theme_category: str | None = None,
+    omit_missing_event_date: bool = False,
+    issue_date_label: str = "Issue date",
 ) -> bytes:
-    """Render a designed, single-page landscape certificate without local file storage."""
-    dark_green = (0.08, 0.31, 0.25)
-    muted_green = (0.20, 0.43, 0.36)
-    gold = (0.78, 0.58, 0.23)
-    ink = (0.12, 0.16, 0.20)
-    muted_ink = (0.34, 0.38, 0.40)
-    commands = [
-        "q",
-        f"{dark_green[0]:.3f} {dark_green[1]:.3f} {dark_green[2]:.3f} RG "
-        "2.2 w 22 22 748 568 re S",
-        f"{gold[0]:.3f} {gold[1]:.3f} {gold[2]:.3f} RG "
-        "0.8 w 32 32 728 548 re S",
-        f"{gold[0]:.3f} {gold[1]:.3f} {gold[2]:.3f} RG "
-        "1.2 w 124 516 m 350 516 l S 442 516 m 668 516 l S",
-        f"{gold[0]:.3f} {gold[1]:.3f} {gold[2]:.3f} rg "
-        "389 512 m 396 519 l 403 512 l 396 505 l h f",
-        "Q",
-    ]
-    commands.append(_pdf_text_command(
-        "CERTIFICATE OF PARTICIPATION", 396, 542, 22, "F2", dark_green, centered=True,
-    ))
-    commands.append(_pdf_text_command(
-        "PRESENTED TO", 396, 490, 10, "F2", muted_green, centered=True,
-    ))
+    """Render a single-page landscape certificate with a split photo-and-type layout."""
+    _register_certificate_fonts()
+    theme = get_certificate_theme(theme_category)
+    navy = HexColor(theme["primary"])
+    accent = HexColor(theme["accent"])
+    paper = Color(0.976, 0.965, 0.929)
+    muted_ink = HexColor("#48566b")
+    dome_jpeg, dome_width, dome_height = _read_dome_image()
+    image_scale = 558 / dome_height
+    image_width = dome_width * image_scale
+    image_height = dome_height * image_scale
+    image_x = 27 - 315 * image_scale
+    image_y = 27
+    buffer = BytesIO()
+    pdf = Canvas(
+        buffer,
+        pagesize=(792, 612),
+        pageCompression=0,
+        pdfVersion=(1, 4),
+        invariant=1,
+    )
+    pdf.setTitle("SkillMatch Certificate of Participation")
+    pdf.setFillColor(paper)
+    pdf.rect(0, 0, 792, 612, stroke=0, fill=1)
+
+    # Keep the existing double border, campus-photo crop, and split-page layout.
+    pdf.setStrokeColor(accent)
+    pdf.setLineWidth(0.9)
+    pdf.rect(18, 18, 756, 576, stroke=1, fill=0)
+    if theme["border_pattern"] == "dashed":
+        pdf.setDash(4, 3)
+    elif theme["border_pattern"] == "dotted":
+        pdf.setDash(1, 3)
+    pdf.rect(25, 25, 742, 562, stroke=1, fill=0)
+    pdf.setDash()
+    photo_clip = pdf.beginPath()
+    photo_clip.moveTo(27, 27)
+    photo_clip.lineTo(27, 585)
+    photo_clip.lineTo(350, 585)
+    photo_clip.curveTo(369, 548, 380, 495, 381, 430)
+    photo_clip.curveTo(383, 352, 380, 280, 371, 210)
+    photo_clip.curveTo(361, 140, 347, 75, 337, 27)
+    photo_clip.lineTo(27, 27)
+    photo_clip.close()
+    pdf.saveState()
+    pdf.clipPath(photo_clip, stroke=0, fill=0)
+    pdf.drawImage(
+        ImageReader(BytesIO(dome_jpeg)),
+        image_x,
+        image_y,
+        width=image_width,
+        height=image_height,
+        preserveAspectRatio=False,
+    )
+    pdf.restoreState()
+
+    photo_edge = pdf.beginPath()
+    photo_edge.moveTo(27, 585)
+    photo_edge.lineTo(350, 585)
+    photo_edge.curveTo(369, 548, 380, 495, 381, 430)
+    photo_edge.curveTo(383, 352, 380, 280, 371, 210)
+    photo_edge.curveTo(361, 140, 347, 75, 337, 27)
+    photo_edge.lineTo(27, 27)
+    pdf.setStrokeColor(accent)
+    pdf.setLineWidth(1.5)
+    pdf.drawPath(photo_edge, stroke=1, fill=0)
+
+    photo_detail = pdf.beginPath()
+    photo_detail.moveTo(346, 582)
+    photo_detail.curveTo(365, 545, 375, 490, 377, 427)
+    photo_detail.curveTo(379, 352, 376, 280, 367, 210)
+    photo_detail.curveTo(358, 140, 344, 75, 333, 30)
+    pdf.setLineWidth(0.55)
+    pdf.drawPath(photo_detail, stroke=1, fill=0)
+
+    diamond = pdf.beginPath()
+    diamond.moveTo(576, 532)
+    diamond.lineTo(581, 537)
+    diamond.lineTo(586, 532)
+    diamond.lineTo(581, 527)
+    diamond.close()
+    pdf.setFillColor(accent)
+    pdf.drawPath(diamond, stroke=0, fill=1)
+    pdf.setLineWidth(0.9)
+    pdf.line(448, 534, 510, 534)
+    pdf.line(652, 534, 714, 534)
+
+    # Preserve the certificate's existing gold botanical ornament.
+    branch = pdf.beginPath()
+    branch.moveTo(366, 29)
+    branch.curveTo(380, 55, 390, 100, 414, 151)
+    pdf.setLineWidth(0.75)
+    pdf.drawPath(branch, stroke=1, fill=0)
+    leaf_curves = (
+        ((371, 47), (362, 45), (357, 49), (354, 55), (362, 59), (369, 56), (371, 47)),
+        ((378, 64), (388, 57), (396, 58), (400, 63), (394, 70), (386, 70), (378, 64)),
+        ((382, 81), (372, 77), (365, 81), (363, 87), (371, 92), (378, 89), (382, 81)),
+        ((388, 98), (398, 90), (407, 91), (411, 96), (404, 103), (396, 104), (388, 98)),
+        ((394, 116), (384, 112), (377, 116), (375, 122), (383, 127), (390, 124), (394, 116)),
+        ((401, 134), (411, 126), (419, 128), (422, 133), (415, 140), (407, 140), (401, 134)),
+    )
+    for start, c1, c2, end, c3, c4, finish in leaf_curves:
+        leaf = pdf.beginPath()
+        leaf.moveTo(*start)
+        leaf.curveTo(*c1, *c2, *end)
+        leaf.curveTo(*c3, *c4, *finish)
+        pdf.drawPath(leaf, stroke=1, fill=0)
+
+    _draw_theme_emblem(pdf, theme)
+    _draw_certificate_text(
+        pdf, "MIT WORLD PEACE UNIVERSITY", 581, 566, 10, "DM-Sans-Bold", navy,
+    )
+    _draw_certificate_text(pdf, "PUNE", 581, 551, 7, "DM-Sans-Bold", navy)
+    _draw_certificate_text(
+        pdf, "CERTIFICATE OF", 581, 501, 20, "Fraunces-SemiBold", navy,
+    )
+    heading_lines, heading_size = _fit_pdf_text(
+        theme["heading"], 346, 29, 13, 1, bold=True, font_name="Fraunces-Bold",
+    )
+    _draw_certificate_text(
+        pdf, heading_lines[0], 581, 472, heading_size, "Fraunces-Bold", navy,
+    )
+    _draw_certificate_text(
+        pdf, "PRESENTED TO", 581, 438, 8, "DM-Sans-Bold", navy,
+    )
 
     name_lines, name_size = _fit_pdf_text(
         volunteer_name, 670, preferred_size=34, minimum_size=22, max_lines=3, bold=True,
@@ -227,60 +360,87 @@ def _render_certificate_pdf(
         commands.append(_pdf_text_command(line, 396, event_y, event_size, "F2", ink, centered=True))
         event_y -= event_size + 2
 
-    details_y = event_y - 7
-    event_date_text = _format_certificate_date(event_date) or "Not recorded"
+    event_date_text = _format_certificate_date(event_date)
     issue_date_text = _format_certificate_date(issue_date) or "Not recorded"
-    commands.append(_pdf_text_command(
-        f"Event date: {event_date_text}", 396, details_y, 11, "F1", muted_ink, centered=True,
-    ))
-    commands.append(_pdf_text_command(
-        f"Issue date: {issue_date_text}", 396, details_y - 19, 11, "F1", muted_ink, centered=True,
-    ))
-    commands.append(_pdf_text_command(
-        f"{format_decimal(hours)} volunteer hours",
-        396, details_y - 49, 16, "F2", dark_green, centered=True,
-    ))
-    commands.append(_pdf_text_command(
-        f"Verification code: {verification_code}",
-        396, details_y - 88, 11, "F2", ink, centered=True,
-    ))
-    commands.append(_pdf_text_command(
-        "Verify this certificate at /verify",
-        396, details_y - 108, 10, "F1", muted_ink, centered=True,
-    ))
-    commands.extend([
-        f"{gold[0]:.3f} {gold[1]:.3f} {gold[2]:.3f} RG "
-        "1 w 301 87 m 491 87 l S",
-        _pdf_text_command(
-            "Event Organizer Signature", 396, 69, 9, "F1", muted_ink, centered=True,
-        ),
-    ])
-    stream = "\n".join(commands).encode("cp1252", errors="replace")
-    objects = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 792 612] /Resources "
-        b"<< /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
-        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n"
-        + stream + b"\nendstream",
-    ]
-    pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-    offsets = [0]
-    for index, body in enumerate(objects, start=1):
-        offsets.append(len(pdf))
-        pdf.extend(f"{index} 0 obj\n".encode("ascii"))
-        pdf.extend(body)
-        pdf.extend(b"\nendobj\n")
-    xref_offset = len(pdf)
-    pdf.extend(f"xref\n0 {len(offsets)}\n".encode("ascii"))
-    pdf.extend(b"0000000000 65535 f \n")
-    for offset in offsets[1:]:
-        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
-    pdf.extend(
-        f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\n"
-        f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    if event_date_text or not omit_missing_event_date:
+        _draw_certificate_text(
+            pdf, f"Event date: {event_date_text or 'Not recorded'}",
+            text_center, details_y, 9, "DM-Sans", muted_ink,
+        )
+    else:
+        details_y += 16
+    _draw_certificate_text(
+        pdf,
+        f"{issue_date_label}: {issue_date_text}",
+        text_center,
+        details_y - 16,
+        9,
+        "DM-Sans",
+        muted_ink,
+    )
+    _draw_certificate_text(
+        pdf,
+        "Hours: N/A" if hours is None else f"{format_decimal(hours)} volunteer hours",
+        text_center,
+        details_y - 45,
+        14,
+        "DM-Sans-Bold",
+        navy,
+    )
+    citation_lines, citation_size = _fit_pdf_text(
+        theme["citation"], 346, 8, 7, 1, font_name="DM-Sans",
+    )
+    _draw_certificate_text(
+        pdf, citation_lines[0], text_center, details_y - 62,
+        citation_size, "DM-Sans", navy,
+    )
+    _draw_certificate_text(
+        pdf,
+        "Verification code available in your SkillMatch profile",
+        text_center,
+        details_y - 76,
+        8,
+        "DM-Sans-Bold",
+        navy,
+    )
+    _draw_certificate_text(
+        pdf, "Verify at /verify", text_center, details_y - 94, 8, "DM-Sans", muted_ink,
+    )
+
+    pdf.setStrokeColor(accent)
+    pdf.setLineWidth(0.9)
+    pdf.line(507, 82, 655, 82)
+    signature_name = (
+        " ".join(organizer_name.split())
+        if isinstance(organizer_name, str) and organizer_name.strip()
+        else "Event Organizer"
+    )
+    organizer_lines, organizer_size = _fit_pdf_text(
+        signature_name,
+        140,
+        preferred_size=9,
+        minimum_size=6,
+        max_lines=1,
+        bold=True,
+        font_name="DM-Sans-Bold",
+    )
+    _draw_certificate_text(
+        pdf,
+        organizer_lines[0],
+        text_center,
+        65,
+        organizer_size,
+        "DM-Sans-Bold",
+        navy,
+    )
+    _draw_certificate_text(
+        pdf,
+        "Event Organizer Signature",
+        text_center,
+        51,
+        7,
+        "DM-Sans",
+        muted_ink,
     )
     return bytes(pdf)
 
@@ -315,6 +475,9 @@ def render_certificate_pdf(record: Mapping[str, Any]) -> bytes | None:
         code,
         event_date=record.get("event_date"),
         issue_date=record.get("generated_at"),
+        volunteer_role=volunteer_role,
+        organizer_name=organizer_name,
+        theme_category=record.get("theme_category"),
     )
 
 
@@ -386,6 +549,8 @@ def generate_certificate(
                 "hours": application.get("hours", 0),
                 "notes": application.get("notes", ""),
                 "generated_at": datetime.now(timezone.utc).isoformat(),
+                "category": event_category(event),
+                "theme_category": event_category(event),
             }
 
         code = record.get("verification_code")
@@ -542,6 +707,195 @@ def get_user_certificates(username: str) -> list[dict[str, Any]]:
     )
 
 
+def get_skill_passport(username: str) -> dict[str, Any]:
+    """Build a private skill portfolio from completed, organizer-confirmed work.
+
+    A verified skill must have been required by a completed event whose accepted
+    application has an organizer-assigned role and confirmed attendance or
+    positive recorded hours. Self-reported skills alone never create a claim.
+    """
+    if not isinstance(username, str) or not username.strip():
+        raise ValueError("Enter a valid volunteer username.")
+    username = username.strip()
+
+    users = _load_object(USERS_FILE, "keyed by username")
+    user = users.get(username)
+    if not isinstance(user, Mapping) or user.get("role") != "Student Volunteer":
+        return {
+            "completed_event_count": 0,
+            "total_hours": 0.0,
+            "contributions": [],
+            "verified_skills": [],
+        }
+
+    events = _load_object(EVENTS_FILE, "keyed by event ID")
+    applications = _load_object(APPLICATIONS_FILE, "keyed by event ID")
+    certificates = _load_object(CERTIFICATES_FILE, "keyed by verification code")
+    certificates_by_event: dict[str, str] = {}
+    for record in certificates.values():
+        if (
+            isinstance(record, Mapping)
+            and record.get("username") == username
+            and isinstance(record.get("event_id"), str)
+        ):
+            code = _normalize_verification_code(record.get("verification_code"))
+            if code:
+                certificates_by_event.setdefault(record["event_id"], code)
+
+    contributions: list[dict[str, Any]] = []
+    skills_by_name: dict[str, dict[str, Any]] = {}
+    total_hours = 0.0
+
+    for event_id, event in events.items():
+        if (
+            not isinstance(event_id, str)
+            or not isinstance(event, Mapping)
+            or event.get("status") != "completed"
+        ):
+            continue
+
+        event_applications = applications.get(event_id, {})
+        if not isinstance(event_applications, Mapping):
+            continue
+        application = event_applications.get(username)
+        if (
+            not isinstance(application, Mapping)
+            or not isinstance(application.get("status"), str)
+            or application["status"].casefold() != "accepted"
+        ):
+            continue
+
+        role = application.get("role")
+        if not isinstance(role, str) or not role.strip():
+            continue
+        hours = application.get("hours", 0)
+        if (
+            not isinstance(hours, (int, float))
+            or isinstance(hours, bool)
+            or not math.isfinite(hours)
+            or hours < 0
+        ):
+            hours = 0
+        if application.get("attended") is not True and hours <= 0:
+            continue
+
+        required_skills = event.get("required_skills", {})
+        event_skills = []
+        if isinstance(required_skills, Mapping):
+            seen_skills: set[str] = set()
+            for skill in required_skills:
+                if not isinstance(skill, str) or not skill.strip():
+                    continue
+                normalized_skill = " ".join(skill.split()).casefold()
+                if normalized_skill in seen_skills:
+                    continue
+                seen_skills.add(normalized_skill)
+                event_skills.append(" ".join(skill.split()))
+
+        if float(hours).is_integer():
+            hours = int(hours)
+        certificate_code = certificates_by_event.get(event_id)
+        contribution = {
+            "event_id": event_id,
+            "event_name": (
+                event.get("name")
+                if isinstance(event.get("name"), str) and event.get("name").strip()
+                else event_id
+            ),
+            "event_date": _event_date_value(event),
+            "role": role.strip(),
+            "hours": hours,
+            "skills": event_skills,
+            "certificate_code": certificate_code,
+            "event_linkable": not bool(event.get("deleted_at")),
+            "sort_date": str(
+                event.get("completed_at") or event.get("date") or ""
+            ),
+        }
+        contributions.append(contribution)
+        total_hours += float(hours)
+
+        for skill in event_skills:
+            normalized_skill = " ".join(skill.split()).casefold()
+            skill_entry = skills_by_name.setdefault(
+                normalized_skill, {"name": skill, "evidence": []}
+            )
+            skill_entry["evidence"].append(contribution)
+
+    contributions.sort(
+        key=lambda item: (item["sort_date"], item["event_name"].casefold()),
+        reverse=True,
+    )
+    verified_skills = sorted(
+        skills_by_name.values(), key=lambda item: item["name"].casefold()
+    )
+    for skill in verified_skills:
+        skill["evidence"].sort(
+            key=lambda item: (item["sort_date"], item["event_name"].casefold()),
+            reverse=True,
+        )
+
+    if total_hours.is_integer():
+        total_hours = int(total_hours)
+    return {
+        "completed_event_count": len(contributions),
+        "total_hours": total_hours,
+        "contributions": contributions,
+        "verified_skills": verified_skills,
+    }
+
+
+def get_volunteer_badge(username: str) -> dict[str, Any] | None:
+    """Return the volunteer's current hours tier, based on completed-event records."""
+    if not isinstance(username, str) or not username.strip():
+        return None
+
+    events = _load_object(EVENTS_FILE, "keyed by event ID")
+    applications = _load_object(APPLICATIONS_FILE, "keyed by event ID")
+    total_hours = 0.0
+    for event_id, event in events.items():
+        if not isinstance(event, Mapping) or event.get("status") != "completed":
+            continue
+        event_applications = applications.get(event_id, {})
+        if not isinstance(event_applications, Mapping):
+            raise ValueError(f"Applications for event '{event_id}' must be an object.")
+        application = event_applications.get(username)
+        if (
+            not isinstance(application, Mapping)
+            or not isinstance(application.get("status"), str)
+            or application["status"].casefold() != "accepted"
+        ):
+            continue
+        hours = application.get("hours")
+        if (
+            isinstance(hours, (int, float))
+            and not isinstance(hours, bool)
+            and math.isfinite(hours)
+            and hours > 0
+        ):
+            total_hours += float(hours)
+
+    if total_hours <= 0:
+        return None
+    if total_hours >= 100:
+        badge, next_badge, next_threshold = "Diamond", None, None
+    elif total_hours >= 25:
+        badge, next_badge, next_threshold = "Gold", "Diamond", 100
+    elif total_hours >= 10:
+        badge, next_badge, next_threshold = "Silver", "Gold", 25
+    else:
+        badge, next_badge, next_threshold = "Copper", "Silver", 10
+    return {
+        "name": badge,
+        "slug": badge.lower(),
+        "total_hours": total_hours,
+        "next_badge": next_badge,
+        "hours_until_next": (
+            next_threshold - total_hours if next_threshold is not None else None
+        ),
+    }
+
+
 def get_certificate_for_user(
     verification_code: str, username: str
 ) -> dict[str, Any] | None:
@@ -557,6 +911,18 @@ def get_certificate_for_user(
     ):
         return None
     return dict(record)
+
+
+def render_verified_certificate_pdf(verification_code: str) -> bytes | None:
+    """Render public certificate content only for an existing, exact verification code."""
+    code = _normalize_verification_code(verification_code)
+    if code is None:
+        return None
+    certificates = _load_object(CERTIFICATES_FILE, "keyed by verification code")
+    record = certificates.get(code)
+    if not isinstance(record, Mapping) or record.get("verification_code") != code:
+        return None
+    return render_certificate_pdf(record)
 
 
 def verify_certificate(verification_code: str) -> dict[str, Any] | None:
@@ -603,4 +969,5 @@ def verify_certificate(verification_code: str) -> dict[str, Any] | None:
         "issue_date": _format_certificate_date(record.get("generated_at")),
         "hours": hours,
         "pdf_available": True,
+        "theme": get_certificate_theme(record.get("theme_category")),
     }

@@ -3,7 +3,9 @@
 from functools import wraps
 from io import BytesIO
 
-from flask import Blueprint, abort, g, render_template, request, send_file, url_for
+from flask import (
+    Blueprint, abort, g, make_response, redirect, render_template, request, send_file, url_for,
+)
 
 from auth_routes import _login_required, _require_csrf
 from certificate_service import (
@@ -16,6 +18,7 @@ from certificate_service import (
     verify_certificate,
 )
 from data_store import load
+from prismlabs_service import certificate_for_id, get_prismlabs_certificates, render_prism_certificate
 
 
 certificates_bp = Blueprint("certificates", __name__)
@@ -55,6 +58,13 @@ def home():
     if current_user.get("role") == "Student Volunteer":
         try:
             certificates = get_user_certificates(current_user["username"])
+            imported = get_prismlabs_certificates(current_user["username"])
+            imported_event_ids = {record["event_id"] for record in imported}
+            certificates = [
+                record for record in certificates
+                if record.get("event_id") not in imported_event_ids
+            ] + imported
+            certificates.sort(key=lambda record: str(record.get("generated_at", "")), reverse=True)
             event_records = load("events.json")
             if not isinstance(event_records, dict):
                 raise ValueError("events.json must contain an object keyed by event ID.")
@@ -123,8 +133,24 @@ def download(verification_code):
     """Download only a certificate owned by the signed-in volunteer."""
     record = get_certificate_for_user(verification_code, g.current_user["username"])
     if record is None:
-        abort(404)
-    pdf_bytes = render_certificate_pdf(record)
+        owned = next((
+            item for item in get_prismlabs_certificates(g.current_user["username"])
+            if item["verification_code"] == verification_code
+        ), None)
+        if owned is None:
+            abort(404)
+        payload = certificate_for_id(verification_code)
+        if payload is None:
+            abort(404)
+        record = owned
+        pdf_bytes = render_prism_certificate(
+            payload, url_for(
+                "certificates.verify_prismlabs_certificate",
+                certificate_id=verification_code, _external=True,
+            ),
+        )
+    else:
+        pdf_bytes = render_certificate_pdf(record)
     if pdf_bytes is None:
         abort(404)
     return send_file(
@@ -138,11 +164,16 @@ def download(verification_code):
 @certificates_bp.route("/verify", methods=["GET", "POST"])
 def verify():
     """Public certificate verification lookup; reveals details only for a valid code."""
-    code = (
-        request.form.get("verification_code", "").strip().upper()
+    raw_code = (
+        request.form.get("verification_code", "").strip()
         if request.method == "POST"
-        else request.args.get("code", "").strip().upper()
+        else request.args.get("code", "").strip()
     )
+    if raw_code and certificate_for_id(raw_code) is not None:
+        return redirect(url_for(
+            "certificates.verify_prismlabs_certificate", certificate_id=raw_code,
+        ), code=303 if request.method == "POST" else 302)
+    code = raw_code.upper()
     result = verify_certificate(code) if code else None
     searched = request.method == "POST" or bool(code)
     return render_template(
@@ -151,6 +182,24 @@ def verify():
         certificate=result,
         searched=searched,
     )
+
+
+@certificates_bp.get("/verify/<certificate_id>")
+def verify_prismlabs_certificate(certificate_id):
+    """Public PrismLabs verification URL; never exposes roster-only fields."""
+    payload = certificate_for_id(certificate_id)
+    response = make_response(render_template(
+        "prismlabs/verify.html",
+        result=None if payload is None else {
+            "name": payload["volunteer"]["full_name"],
+            "event": payload["event"]["name"],
+            "date": payload["event"].get("date"),
+            "valid": True,
+        },
+    ), 200 if payload else 404)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 @certificates_bp.get("/verify/<verification_code>/certificate.pdf")
