@@ -10,7 +10,7 @@ SkillMatch is a Flask web app for matching student volunteers with campus events
 - Organizer event and applicant management
 - Attendance and volunteer-hour records
 - Certificates with public verification
-- Contribution and campus-impact charts
+- Contribution and campus-impact charts 
 
 ## Technology
 
